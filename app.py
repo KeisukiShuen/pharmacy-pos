@@ -6,11 +6,8 @@ import os
 app = Flask(__name__)
 app.secret_key = 'gcares_secure_key_2026'
 
-# FIX: This handles both local testing and Render's persistent disk
-if os.path.exists('/data'):
-    DB_FILE = '/data/pharmacy.db'
-else:
-    DB_FILE = 'pharmacy.db'
+# Database configuration for single-store setup
+DB_FILE = 'pharmacy.db'
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -22,126 +19,210 @@ def init_db():
     conn.commit()
     conn.close()
 
-# --- USER ACCOUNTS ---
+# --- ADMIN & STAFF CREDENTIALS ---
 USERS = {
     "admin": {"password": "admin123", "role": "admin"},
     "staff": {"password": "staff123", "role": "staff"}
 }
 
-# --- THE UI (HTML) ---
+# --- COMPLETE UI TEMPLATE ---
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>GCares Pharmacy System</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; color: #333; }
+        :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; --warning: #ffc107; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; color: #333; }
+        
+        /* Centered Login */
         .login-screen { display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .login-card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 380px; text-align: center; }
-        nav { background: #ffffff; padding: 10px 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: {{ 'flex' if logged_in else 'none' }}; align-items: center; justify-content: space-between; }
-        .container { max-width: 1000px; margin: 30px auto; background: white; padding: 25px; border-radius: 12px; }
+        .login-card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 380px; text-align: center; }
+        .login-logo { width: 220px; margin-bottom: 25px; }
+
+        /* Navigation */
+        nav { background: white; padding: 12px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: {{ 'flex' if logged_in else 'none' }}; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+        .nav-brand { display: flex; align-items: center; font-weight: bold; color: var(--primary); }
+        nav a { color: #555; margin-left: 20px; text-decoration: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        nav a:hover { color: var(--primary); }
+        
+        /* Layout */
+        .container { max-width: 1100px; margin: 30px auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
         .hidden { display: none; }
-        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; }
-        button { background: #28a745; color: white; border: none; font-weight: bold; cursor: pointer; }
+        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 1rem; }
+        button { background: var(--success); color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:hover { filter: brightness(90%); }
+        
+        /* Tables */
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border-bottom: 1px solid #eee; padding: 12px; text-align: left; }
-        .btn-select { background: #007bff; width: auto; padding: 5px 10px; }
+        th, td { padding: 15px; border-bottom: 1px solid #eee; text-align: left; }
+        th { background: #f8f9fa; font-size: 0.9rem; text-transform: uppercase; color: #666; }
+        
+        /* Badges */
+        .low-stock { color: var(--danger); font-weight: bold; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: bold; }
+        .expired { background: #f8d7da; color: #721c24; }
+        .soon { background: #fff3cd; color: #856404; }
+        
+        .search-input { padding-left: 40px; background: white url('https://www.w3schools.com/howto/searchicon.png') no-repeat 13px center; background-size: 16px; }
+        .btn-sm { width: auto; padding: 6px 12px; font-size: 0.85rem; margin: 0; }
+        .btn-blue { background: var(--primary); }
+        .btn-red { background: var(--danger); }
     </style>
 </head>
 <body>
+
 {% if not logged_in %}
     <div class="login-screen">
         <div class="login-card">
-            <h2>GCares Pharmacy</h2>
+            <img src="https://raw.githubusercontent.com/KeisukiShuen/pharmacy-pos/refs/heads/main/GCaresText2.png" class="login-logo" alt="GCares Logo">
+            <h2 style="margin-top:0;">Pharmacy Login</h2>
             <form method="POST" action="/login">
-                <input type="text" name="username" placeholder="Username" required>
+                <input type="text" name="username" placeholder="Username" required autofocus>
                 <input type="password" name="password" placeholder="Password" required>
-                <button type="submit">Login</button>
+                <button type="submit" style="background: var(--primary);">Login to System</button>
             </form>
         </div>
     </div>
 {% else %}
     <nav>
-        <b>GCares POS</b>
+        <div class="nav-brand">
+            <img src="https://raw.githubusercontent.com/KeisukiShuen/pharmacy-pos/refs/heads/main/GCaresText2.png" style="height: 40px; margin-right: 10px;">
+            GCares
+        </div>
         <div>
             <a onclick="showPage('pos')">🛒 Checkout</a>
             {% if role == 'admin' %}
             <a onclick="showPage('admin')">⚙️ Inventory</a>
             <a onclick="showPage('reports')">📊 Reports</a>
             {% endif %}
-            <a href="/logout" style="color: red; margin-left: 15px;">Logout</a>
+            <a href="/logout" style="color: var(--danger);">Logout</a>
         </div>
     </nav>
+
     <div class="container" id="posPage">
-        <h2>Checkout</h2>
-        <input type="text" id="pId" placeholder="ID (Select from list)" readonly>
-        <input type="number" id="qty" placeholder="Qty">
-        <button onclick="sell()">Process Sale</button>
-        <input type="text" id="posSearch" placeholder="Search medicine..." onkeyup="filterTable('posTable', 'posSearch')">
+        <h2>POS Checkout</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px;">
+            <input type="text" id="pId" placeholder="Medicine ID (Select from list)" readonly style="background: #f0f0f0;">
+            <input type="number" id="qty" placeholder="Quantity">
+            <button onclick="sell()" style="width: 180px;">Complete Transaction</button>
+        </div>
+        <hr style="margin: 25px 0; border: 0; border-top: 1px solid #eee;">
+        <input type="text" id="posSearch" class="search-input" placeholder="Search for medicine name..." onkeyup="filterTable('posTable', 'posSearch')">
         <div id="posTable"></div>
     </div>
+
     <div class="container hidden" id="adminPage">
-        <h2>Inventory</h2>
-        <input type="text" id="newName" placeholder="Medicine Name">
-        <input type="number" id="newPrice" placeholder="Price">
-        <input type="number" id="newStock" placeholder="Stock">
-        <input type="date" id="newExpiry">
-        <button onclick="addProduct()">Add Product</button>
+        <h2>Inventory Management</h2>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 25px; border: 1px solid #eee;">
+            <h4 style="margin: 0 0 15px 0;">Add New Product</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <input type="text" id="newName" placeholder="Medicine Name">
+                <input type="number" id="newPrice" placeholder="Price (₱)">
+                <input type="number" id="newStock" placeholder="Initial Stock">
+                <input type="date" id="newExpiry">
+            </div>
+            <button onclick="addProduct()" style="background: var(--primary); margin-top: 15px;">Save to Inventory</button>
+        </div>
+        <input type="text" id="adminSearch" class="search-input" placeholder="Search inventory..." onkeyup="filterTable('adminTable', 'adminSearch')">
         <div id="adminTable"></div>
     </div>
+
     <div class="container hidden" id="reportsPage">
-        <h2>Total Sales: <span id="rev">0</span></h2>
+        <div style="text-align: center; background: #e7f3ff; padding: 25px; border-radius: 15px; margin-bottom: 30px;">
+            <p style="margin:0; color: #666;">Total Revenue</p>
+            <h1 style="margin:5px 0; color: var(--success); font-size: 2.5rem;" id="revenueText">₱0.00</h1>
+            <button onclick="window.print()" class="btn-sm" style="background: #666;">Print Report</button>
+        </div>
+        <h3>Sales History</h3>
         <div id="salesTable"></div>
     </div>
 {% endif %}
+
 <script>
-    function showPage(p) { 
-        document.querySelectorAll('.container').forEach(c => c.classList.add('hidden')); 
-        document.getElementById(p+'Page').classList.remove('hidden'); 
-        if(p==='reports') loadReports(); else loadData();
+    function showPage(page) {
+        document.querySelectorAll('.container').forEach(c => c.classList.add('hidden'));
+        document.getElementById(page + 'Page').classList.remove('hidden');
+        if(page === 'reports') loadReports(); else loadData();
     }
+
     async function loadData() {
-        const r = await fetch('/data');
-        const d = await r.json();
-        render(d);
+        const res = await fetch('/data');
+        const data = await res.json();
+        renderTable(data, 'posTable', false);
+        if(document.getElementById('adminTable')) renderTable(data, 'adminTable', true);
     }
-    function render(data) {
-        let h = "<table><tr><th>ID</th><th>Name</th><th>Stock</th><th>Price</th><th>Action</th></tr><tbody id='posTable_body'>";
-        data.forEach(i => {
-            h += `<tr><td>${i[0]}</td><td>${i[1]}</td><td>${i[2]}</td><td>${i[3]}</td><td><button class='btn-select' onclick='selectItem(${i[0]})'>Select</button></td></tr>`;
+
+    function selectItem(id, name) {
+        document.getElementById('pId').value = id;
+        document.getElementById('qty').focus();
+    }
+
+    function renderTable(data, containerId, isAdmin) {
+        const now = new Date();
+        const soon = new Date(); soon.setDate(now.getDate() + 30);
+
+        let html = `<table><thead><tr><th>ID</th><th>Medicine Name</th><th>Stock</th><th>Price</th><th>Expiry</th><th>Action</th></tr></thead><tbody id="${containerId}_body">`;
+        data.forEach(r => {
+            const exp = r[4] ? new Date(r[4]) : null;
+            let expBadge = r[4] || 'N/A';
+            if(exp) {
+                if(exp < now) expBadge = `<span class="badge expired">Expired</span>`;
+                else if(exp <= soon) expBadge = `<span class="badge soon">${r[4]}</span>`;
+            }
+            let stockClass = r[2] < 10 ? 'class="low-stock"' : '';
+            
+            html += `<tr><td>${r[0]}</td><td style="font-weight: bold;">${r[1]}</td><td ${stockClass}>${r[2]}</td><td>₱${r[3].toFixed(2)}</td><td>${expBadge}</td><td>
+                ${isAdmin ? `<button class="btn-sm btn-red" onclick="deleteItem(${r[0]})">Delete</button>` : `<button class="btn-sm btn-blue" onclick="selectItem(${r[0]})">Select</button>`}
+            </td></tr>`;
         });
-        document.getElementById('posTable').innerHTML = h + "</tbody></table>";
-        if(document.getElementById('adminTable')) document.getElementById('adminTable').innerHTML = h + "</tbody></table>";
+        document.getElementById(containerId).innerHTML = html + "</tbody></table>";
     }
-    function selectItem(id) { document.getElementById('pId').value = id; }
+
     function filterTable(tid, sid) {
-        let f = document.getElementById(sid).value.toUpperCase();
-        let rows = document.getElementById(tid+'_body').getElementsByTagName('tr');
-        for (let r of rows) { r.style.display = r.innerText.toUpperCase().includes(f) ? '' : 'none'; }
+        let input = document.getElementById(sid).value.toUpperCase();
+        let rows = document.getElementById(tid + "_body").getElementsByTagName("tr");
+        for (let row of rows) {
+            let txt = row.getElementsByTagName("td")[1].textContent.toUpperCase();
+            row.style.display = txt.includes(input) ? "" : "none";
+        }
     }
+
     async function sell() {
         const id = document.getElementById('pId').value;
-        const q = document.getElementById('qty').value;
-        await fetch('/sell', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id, qty:q}) });
-        loadData();
+        const qty = document.getElementById('qty').value;
+        if(!id || !qty) return alert("Select medicine and quantity!");
+        const res = await fetch('/sell', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id, qty}) });
+        const result = await res.json();
+        if(result.error) alert(result.error); else { alert(result.message); loadData(); }
     }
+
     async function addProduct() {
-        const n = document.getElementById('newName').value;
-        const p = document.getElementById('newPrice').value;
-        const s = document.getElementById('newStock').value;
-        const e = document.getElementById('newExpiry').value;
-        await fetch('/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name:n, price:p, stock:s, expiry:e}) });
+        const name = document.getElementById('newName').value;
+        const stock = document.getElementById('newStock').value;
+        const price = document.getElementById('newPrice').value;
+        const expiry = document.getElementById('newExpiry').value;
+        if(!name || !stock || !price) return alert("Fill Name, Stock, and Price!");
+        await fetch('/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name, stock, price, expiry}) });
         loadData();
     }
+
+    async function deleteItem(id) {
+        if(confirm("Permanently delete this item?")) {
+            await fetch('/delete/' + id, { method: 'POST' });
+            loadData();
+        }
+    }
+
     async function loadReports() {
-        const r = await fetch('/reports_data');
-        const d = await r.json();
-        let t = 0;
-        let h = "<table><tr><th>Date</th><th>Item</th><th>Total</th></tr>";
-        d.forEach(s => { t += s[4]; h += `<tr><td>${s[5]}</td><td>${s[2]}</td><td>${s[4]}</td></tr>`; });
-        document.getElementById('rev').innerText = "₱" + t.toFixed(2);
-        document.getElementById('salesTable').innerHTML = h + "</table>";
+        const res = await fetch('/sales_data');
+        const data = await res.json();
+        let total = 0;
+        let html = "<table><thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Total</th></tr></thead>";
+        data.forEach(r => { total += r[4]; html += `<tr><td>${r[5].substring(0,16)}</td><td>${r[2]}</td><td>${r[3]}</td><td>₱${r[4].toFixed(2)}</td></tr>`; });
+        document.getElementById('revenueText').innerText = "₱" + total.toFixed(2);
+        document.getElementById('salesTable').innerHTML = html + "</table>";
     }
     {% if logged_in %} loadData(); {% endif %}
 </script>
@@ -149,9 +230,8 @@ HTML_TEMPLATE = '''
 </html>
 '''
 
-# --- SERVER ROUTES ---
 @app.route('/')
-def index(): return render_template_string(HTML_TEMPLATE, logged_in='user' in session, role=session.get('role'))
+def home(): return render_template_string(HTML_TEMPLATE, logged_in='user' in session, role=session.get('role'))
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -165,7 +245,7 @@ def logout(): session.clear(); return redirect('/')
 
 @app.route('/data')
 def get_data():
-    conn = sqlite3.connect(DB_FILE); d = conn.execute("SELECT * FROM inventory").fetchall(); conn.close()
+    conn = sqlite3.connect(DB_FILE); d = conn.execute("SELECT * FROM inventory ORDER BY name ASC").fetchall(); conn.close()
     return jsonify(d)
 
 @app.route('/add', methods=['POST'])
@@ -177,17 +257,27 @@ def add():
 @app.route('/sell', methods=['POST'])
 def sell():
     r = request.json; conn = sqlite3.connect(DB_FILE); cur = conn.cursor()
-    cur.execute("SELECT stock, price, name FROM inventory WHERE id=?", (r['id'],))
+    cur.execute("SELECT stock, price, name, expiry_date FROM inventory WHERE id=?", (r['id'],))
     i = cur.fetchone()
-    if i and i[0] >= int(r['qty']):
-        cur.execute("UPDATE inventory SET stock=? WHERE id=?", (i[0]-int(r['qty']), r['id']))
-        cur.execute("INSERT INTO sales (product_id, product_name, qty, total) VALUES (?,?,?,?)", (r['id'], i[2], r['qty'], int(r['qty'])*i[1]))
-        conn.commit()
-    conn.close(); return jsonify({"ok": True})
+    if i:
+        if i[3] and datetime.strptime(i[3], '%Y-%m-%d') < datetime.now():
+            return jsonify({"error": "Error: Expired medicine!"})
+        if i[0] >= int(r['qty']):
+            cur.execute("UPDATE inventory SET stock=? WHERE id=?", (i[0]-int(r['qty']), r['id']))
+            cur.execute("INSERT INTO sales (product_id, product_name, qty, total) VALUES (?,?,?,?)", (r['id'], i[2], r['qty'], int(r['qty'])*i[1]))
+            conn.commit(); msg = {"message": "Success!"}
+        else: msg = {"error": "Error: Low stock!"}
+    else: msg = {"error": "Error: Not found!"}
+    conn.close(); return jsonify(msg)
 
-@app.route('/reports_data')
-def reports_data():
-    conn = sqlite3.connect(DB_FILE); d = conn.execute("SELECT * FROM sales").fetchall(); conn.close()
+@app.route('/delete/<int:id>', methods=['POST'])
+def delete(id):
+    conn = sqlite3.connect(DB_FILE); conn.execute("DELETE FROM inventory WHERE id=?", (id,)); conn.commit(); conn.close()
+    return jsonify({"ok": True})
+
+@app.route('/sales_data')
+def sales_data():
+    conn = sqlite3.connect(DB_FILE); d = conn.execute("SELECT * FROM sales ORDER BY date DESC").fetchall(); conn.close()
     return jsonify(d)
 
 if __name__ == '__main__':
